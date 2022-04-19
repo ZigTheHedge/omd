@@ -3,6 +3,7 @@
   "service.start.success.rest": "Service %s has been started successfully (REST)!",
   "service.start.success.wss": "Service %s has been started successfully (WSS)!",
   "service.start.failure": "Service %s has failed to start! %s",
+  "service.start.failure.wait": "Service %s seems to be valid, but cannot connect due to timeout, retrying (REST)...",
   "service.wss.notsupported": "WSS for %s is not supported yet! Use REST!",
   "service.websocket.disconnect": "Service %s has disconnected from wss! Reason: %s",
   "service.websocket.tryreconnect": "Trying to reconnect to %s...",

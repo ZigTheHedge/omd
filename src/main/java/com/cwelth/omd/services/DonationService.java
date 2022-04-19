@@ -36,7 +36,7 @@ public abstract class DonationService {
     public EnumWssState wssState = EnumWssState.START;
     public String lastDonationId = null;
 
-    public static ExecutorService executorThread = Executors.newFixedThreadPool(1);
+    public ExecutorService executorThread = Executors.newFixedThreadPool(1);
 
     public DonationService(String category_name){
         CATEGORY = category_name;

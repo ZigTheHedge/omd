@@ -7,6 +7,7 @@ import com.cwelth.omd.services.DonationAlerts;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import net.minecraft.client.entity.player.ClientPlayerEntity;
+import net.minecraft.client.entity.player.RemoteClientPlayerEntity;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.Commands;
 import net.minecraftforge.common.MinecraftForge;
@@ -61,6 +62,7 @@ public class OMD
         {
             if (event.phase != TickEvent.Phase.START && event.side == LogicalSide.CLIENT)
             {
+                if(event.player instanceof RemoteClientPlayerEntity) return;
                 Config.DA.start((ClientPlayerEntity)event.player);
                 Config.DP.start((ClientPlayerEntity)event.player);
                 Config.SL.start((ClientPlayerEntity)event.player);
