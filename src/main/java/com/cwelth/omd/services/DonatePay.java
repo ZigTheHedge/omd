@@ -1,6 +1,7 @@
 package com.cwelth.omd.services;
 
 import com.cwelth.omd.Config;
+import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -38,9 +39,10 @@ public class DonatePay extends DonationService {
         if(Config.DP.OAUTH_KEY.get().isEmpty()) return false;
         started = true;
         this.player = player;
-
+        OMD.LOGGER.info("[OMD] Starting DonatePay service...");
         if(Config.DP.WEB_SOCKET.get()) {
             player.sendMessage(new TranslationTextComponent("service.wss.notsupported", CATEGORY), Util.NIL_UUID);
+            OMD.LOGGER.error("[OMD] DonatePay failed to start (WSS not supported).");
             return false;
         } else
         {
@@ -53,17 +55,20 @@ public class DonatePay extends DonationService {
             {
                 this.valid = false;
                 player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                OMD.LOGGER.error("[OMD] DonatePay failed to start (Connection issues).");
             } else {
                 JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
                 if(obj.get("status").getAsString().equals("error")) {
                     if(obj.get("message").getAsString().equals("Incorrect token")) {
                         this.valid = false;
                         player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                        OMD.LOGGER.error("[OMD] DonatePay failed to start (Invalid token).");
                     } else {
                         this.revalidationNeeded = true;
                         this.valid = true;
                         ticksLeft = 20;
                         player.sendMessage(new TranslationTextComponent("service.start.failure.wait", CATEGORY), Util.NIL_UUID);
+                        OMD.LOGGER.warn("[OMD] DonatePay start pending (Too many tries).");
                     }
                 } else {
                     JsonArray dataElement = obj.get("data").getAsJsonArray();
@@ -71,6 +76,7 @@ public class DonatePay extends DonationService {
                         lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsString();
                     this.valid = true;
                     player.sendMessage(new TranslationTextComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                    OMD.LOGGER.info("[OMD] DonatePay started successfully.");
                     ticksLeft = POLL_INTERVAL.get() * 20;
                 }
             }
@@ -102,6 +108,7 @@ public class DonatePay extends DonationService {
             {
                 this.revalidationNeeded = false;
                 player.sendMessage(new TranslationTextComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                OMD.LOGGER.info("[OMD] DonatePay started successfully.");
                 if (obj.get("data").getAsJsonArray().size() > 0)
                     lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsString();
                 return;
@@ -131,6 +138,9 @@ public class DonatePay extends DonationService {
                     if(status.equals("success") || status.equals("user"))
                     {
                         ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
+                        String mText = "not found";
+                        if(match != null) mText = match.getCommand();
+                        OMD.LOGGER.info("[OMD] New DonatePay donation! " + nickname + ": " + amount + ", match: " + mText);
                         if (match != null) {
                             if (Config.ECHOING.get().equals("before"))
                                 player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);

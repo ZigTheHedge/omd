@@ -1,6 +1,7 @@
 package com.cwelth.omd.services;
 
 import com.cwelth.omd.Config;
+import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
 import com.cwelth.omd.websocket.WebSocketEndpoint;
 import com.google.gson.JsonArray;
@@ -40,7 +41,7 @@ public class DonationAlerts extends DonationService {
         started = true;
         this.player = player;
         wssState = EnumWssState.START;
-
+        OMD.LOGGER.info("[OMD] Starting DonationAlerts service...");
         if(Config.DA.WEB_SOCKET.get()) {
             HashMap<String, String> headers = new HashMap<>();
             headers.put("Content-Type", "application/json; utf-8");
@@ -52,6 +53,7 @@ public class DonationAlerts extends DonationService {
             {
                 this.valid = false;
                 player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                OMD.LOGGER.error("[OMD] DonationAlerts failed to start (Connection issues).");
                 return false;
             }
 
@@ -85,6 +87,7 @@ public class DonationAlerts extends DonationService {
                                         wssChannelToken = obj.get("channels").getAsJsonArray().get(0).getAsJsonObject().get("token").getAsString();
                                         wssState = EnumWssState.WAITFORCHANNELID;
                                         player.sendMessage(new TranslationTextComponent("service.start.success.wss", CATEGORY), Util.NIL_UUID);
+                                        OMD.LOGGER.info("[OMD] DonationAlerts started successfully.");
 
                                     } else if (obj.get("id").getAsInt() == 2) {
                                         //System.out.println("Got channel_id: " + message);
@@ -97,6 +100,9 @@ public class DonationAlerts extends DonationService {
                                         String nickname = data.get("username").getAsString();
                                         String msg = data.get("message").getAsString();
                                         ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
+                                        String mText = "not found";
+                                        if(match != null) mText = match.getCommand();
+                                        OMD.LOGGER.info("[OMD] New DonationAlerts donation! " + nickname + ": " + amount + ", match: " + mText);
                                         if (match != null) {
                                             if (Config.ECHOING.get().equals("before"))
                                                 player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
