@@ -96,7 +96,7 @@ public class DonationAlerts extends DonationService {
                                 } else if (obj.has("result")) {
                                     if (!obj.get("result").getAsJsonObject().has("type")) {
                                         JsonObject data = obj.get("result").getAsJsonObject().get("data").getAsJsonObject().get("data").getAsJsonObject();
-                                        int amount = data.get("amount_in_user_currency").getAsInt();
+                                        int amount = (int)data.get("amount_in_user_currency").getAsDouble();
                                         String nickname = data.get("username").getAsString();
                                         String msg = data.get("message").getAsString();
                                         ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);

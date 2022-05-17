@@ -148,8 +148,8 @@ public class DonatePay extends DonationService {
                             if (Config.ECHOING.get().equals("after"))
                                 player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                         }
+                        lastDonationId = data.get("id").getAsString();
                     }
-                    lastDonationId = data.get("id").getAsString();
                 }
             }
         });
