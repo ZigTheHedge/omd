@@ -2,18 +2,14 @@ package com.cwelth.omd.services;
 
 import com.cwelth.omd.OMD;
 import com.cwelth.omd.websocket.WebSocketEndpoint;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import joptsimple.util.KeyValuePair;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.player.ClientPlayerEntity;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,7 +22,7 @@ public abstract class DonationService {
     public ForgeConfigSpec.IntValue RECONNECT_INTERVAL;
     public boolean started = false;
     public boolean valid = false;
-    public ClientPlayerEntity player;
+    public LocalPlayer player;
     public int ticksLeft;
     public WebSocketEndpoint websocket = null;
     public String wssClientId = "";
@@ -52,7 +48,7 @@ public abstract class DonationService {
         builder.pop();
     }
 
-    public abstract boolean start(ClientPlayerEntity player);
+    public abstract boolean start(LocalPlayer player);
 
     public void stop()
     {

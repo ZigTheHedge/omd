@@ -1,5 +1,5 @@
 modLoader="javafml" #mandatory
-loaderVersion="[36,)" #mandatory This is typically bumped every Minecraft version by Forge. See our download page for lists of versions.
+loaderVersion="[40,)" #mandatory This is typically bumped every Minecraft version by Forge. See our download page for lists of versions.
 license="All rights reserved"
 
 [[mods]] #mandatory
@@ -11,10 +11,16 @@ authors="ZigTheHedge" #optional
 description='''
 This mod integrates with various donation websites and performs certain actions (console commands) depending on the donation amount
 '''
-[[dependencies.sotscompanion]] #optional
+[[dependencies.omd]] #optional
     modId="forge" #mandatory
     mandatory=true #mandatory
-    versionRange="[36,)" #mandatory
+    versionRange="[40,)" #mandatory
     ordering="NONE"
     side="CLIENT"
-
+[[dependencies.omd]]
+    modId="minecraft"
+    mandatory=true
+    # This version range declares a minimum of the current minecraft version up to but not including the next major version
+    versionRange="[1.18.2,1.19)"
+    ordering="NONE"
+    side="CLIENT"

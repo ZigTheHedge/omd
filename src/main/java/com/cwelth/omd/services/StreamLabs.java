@@ -6,10 +6,10 @@ import com.cwelth.omd.websocket.WebSocketEndpoint;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.util.Util;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.Util;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -24,7 +24,7 @@ public class StreamLabs extends DonationService {
     }
 
     @Override
-    public boolean start(ClientPlayerEntity player) {
+    public boolean start(LocalPlayer player) {
         if(started) return true;
         if(Config.SL.OAUTH_KEY.get().isEmpty()) return false;
         started = true;
@@ -83,7 +83,7 @@ public class StreamLabs extends DonationService {
                 }
             }).start();
             */
-            player.sendMessage(new TranslationTextComponent("service.wss.notsupported", CATEGORY), Util.NIL_UUID);
+            player.sendMessage(new TranslatableComponent("service.wss.notsupported", CATEGORY), Util.NIL_UUID);
             return false;
 
         } else
@@ -96,18 +96,18 @@ public class StreamLabs extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
             } else {
                 JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
                 if(obj.has("error")) {
                     this.valid = false;
-                    player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                    player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
                 } else {
                     JsonArray dataElement = obj.get("data").getAsJsonArray();
                     if (dataElement.size() > 0)
                         lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("donation_id").getAsString();
                     this.valid = true;
-                    player.sendMessage(new TranslationTextComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                    player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
                     ticksLeft = POLL_INTERVAL.get() * 20;
                 }
             }
@@ -151,10 +151,10 @@ public class StreamLabs extends DonationService {
                     ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                     if (match != null) {
                         if (Config.ECHOING.get().equals("before"))
-                            player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                            player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                         match.runCommands(player);
                         if (Config.ECHOING.get().equals("after"))
-                            player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                            player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                     }
                     lastDonationId = data.get("donation_id").getAsString();
                 }

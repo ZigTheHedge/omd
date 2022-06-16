@@ -3,15 +3,15 @@ package com.cwelth.omd.commands;
 import com.cwelth.omd.Config;
 import com.cwelth.omd.OMD;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.builder.ArgumentBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.command.Commands;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TextFormatting;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 public class CmdReload {
-    public static ArgumentBuilder<CommandSource, ?> register(CommandDispatcher<CommandSource> dispatcher) {
+    public static LiteralArgumentBuilder<CommandSourceStack> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("reload")
                 .executes( cs -> {
                     Config.loadConfig(Config.CLIENT_CONFIG, FMLPaths.CONFIGDIR.get().resolve(OMD.MOD_ID + "-client.toml"));
@@ -19,7 +19,7 @@ public class CmdReload {
                     Config.SL.stop();
                     Config.DA.stop();
                     Config.LOCAL.stop();
-                    cs.getSource().sendSuccess(new StringTextComponent("[OMD]" + TextFormatting.AQUA + " Config reloaded."), false);
+                    cs.getSource().sendSuccess(new TextComponent("[OMD]" + ChatFormatting.AQUA + " Config reloaded."), false);
                     return 0;
                 });
     }

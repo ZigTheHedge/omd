@@ -5,13 +5,12 @@ import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
 import com.cwelth.omd.websocket.WebSocketEndpoint;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.util.Util;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.Util;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.net.*;
@@ -35,7 +34,7 @@ public class DonationAlerts extends DonationService {
     }
 
     @Override
-    public boolean start(ClientPlayerEntity player) {
+    public boolean start(LocalPlayer player) {
         if(started) return true;
         if(Config.DA.OAUTH_KEY.get().isEmpty()) return false;
         started = true;
@@ -52,7 +51,7 @@ public class DonationAlerts extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
                 OMD.LOGGER.error("[OMD] DonationAlerts failed to start (Connection issues).");
                 return false;
             }
@@ -60,7 +59,6 @@ public class DonationAlerts extends DonationService {
             JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
             wssToken = obj.get("data").getAsJsonObject().get("socket_connection_token").getAsString();
             serviceUserID = obj.get("data").getAsJsonObject().get("id").getAsString();
-
 
             new Thread(() -> {
                 try {
@@ -86,7 +84,7 @@ public class DonationAlerts extends DonationService {
                                         obj = new JsonParser().parse(response).getAsJsonObject();
                                         wssChannelToken = obj.get("channels").getAsJsonArray().get(0).getAsJsonObject().get("token").getAsString();
                                         wssState = EnumWssState.WAITFORCHANNELID;
-                                        player.sendMessage(new TranslationTextComponent("service.start.success.wss", CATEGORY), Util.NIL_UUID);
+                                        player.sendMessage(new TranslatableComponent("service.start.success.wss", CATEGORY), Util.NIL_UUID);
                                         OMD.LOGGER.info("[OMD] DonationAlerts started successfully.");
 
                                     } else if (obj.get("id").getAsInt() == 2) {
@@ -105,10 +103,10 @@ public class DonationAlerts extends DonationService {
                                         OMD.LOGGER.info("[OMD] New DonationAlerts donation! " + nickname + ": " + amount + ", match: " + mText);
                                         if (match != null) {
                                             if (Config.ECHOING.get().equals("before"))
-                                                player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                                             match.runCommands(player);
                                             if (Config.ECHOING.get().equals("after"))
-                                                player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                                         }
                                     }
                                 } else
@@ -147,6 +145,7 @@ public class DonationAlerts extends DonationService {
                     e.printStackTrace();
                 }
             }).start();
+
         } else {
             HashMap<String, String> headers = new HashMap<>();
             headers.put("Content-Type", "application/json; utf-8");
@@ -156,14 +155,14 @@ public class DonationAlerts extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslationTextComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
             } else {
                 JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
                 JsonArray dataElement = obj.get("data").getAsJsonArray();
                 if(dataElement.size() > 0)
                     lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsString();
                 this.valid = true;
-                player.sendMessage(new TranslationTextComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
                 ticksLeft = POLL_INTERVAL.get() * 20;
             }
         }
@@ -205,10 +204,10 @@ public class DonationAlerts extends DonationService {
                     ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                     if (match != null) {
                         if (Config.ECHOING.get().equals("before"))
-                            player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                            player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                         match.runCommands(player);
                         if (Config.ECHOING.get().equals("after"))
-                            player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                            player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
                     }
                     lastDonationId = data.get("id").getAsString();
                 }

@@ -3,12 +3,10 @@ package com.cwelth.omd.services;
 import com.cwelth.omd.Config;
 import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
-import com.cwelth.omd.data.Thresholds;
-import com.sun.java.accessibility.util.java.awt.TextComponentTranslator;
-import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.util.Util;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.Util;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.io.File;
@@ -16,7 +14,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.UUID;
 
 public class LocalFileWatcher extends DonationService {
     public LocalFileWatcher() {
@@ -34,13 +31,13 @@ public class LocalFileWatcher extends DonationService {
     }
 
     @Override
-    public boolean start(ClientPlayerEntity player) {
+    public boolean start(LocalPlayer player) {
         if(started) return true;
         if(OAUTH_KEY.get().isEmpty()) return false;
         started = true;
         this.player = player;
 
-        this.player.sendMessage(new TranslationTextComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+        this.player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
         return true;
     }
 
@@ -93,10 +90,10 @@ public class LocalFileWatcher extends DonationService {
                 ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                 if (match != null) {
                     if (Config.ECHOING.get().equals("before"))
-                        player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, message)), Util.NIL_UUID);
+                        player.sendMessage(new TextComponent(match.getMessage(amount, nickname, message)), Util.NIL_UUID);
                     match.runCommands(player);
                     if (Config.ECHOING.get().equals("after"))
-                        player.sendMessage(new StringTextComponent(match.getMessage(amount, nickname, message)), Util.NIL_UUID);
+                        player.sendMessage(new TextComponent(match.getMessage(amount, nickname, message)), Util.NIL_UUID);
                 }
                 removeFile(otOMD);
             }

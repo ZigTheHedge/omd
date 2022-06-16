@@ -6,18 +6,16 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
-import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.command.CommandSource;
-import net.minecraft.command.Commands;
-import net.minecraft.command.arguments.ComponentArgument;
-import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TextFormatting;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.server.level.ServerPlayer;
 
 public class CmdTest {
-    public static ArgumentBuilder<CommandSource, ?> register(CommandDispatcher<CommandSource> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("test")
                 .then(Commands.argument("amount", IntegerArgumentType.integer(0))
                         .then(Commands.argument("nickname", StringArgumentType.string())
@@ -27,18 +25,18 @@ public class CmdTest {
                                 ThresholdItem matched = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                                 if(matched == null)
                                 {
-                                    cs.getSource().sendFailure(new TranslationTextComponent("test.nomatch"));
+                                    cs.getSource().sendFailure(new TranslatableComponent("test.nomatch"));
                                     return 0;
                                 }
                                 String nickname = StringArgumentType.getString(cs, "nickname");
                                 String message = StringArgumentType.getString(cs, "message");
-                                cs.getSource().sendSuccess(new StringTextComponent("[OMD]" + TextFormatting.AQUA + " " + matched.getMessage(amount, nickname, message) + "\n" + matched.getCommand()), false);
-                                if(cs.getSource().getEntity() instanceof ServerPlayerEntity)
+                                cs.getSource().sendSuccess(new TextComponent("[OMD]" + ChatFormatting.AQUA + " " + matched.getMessage(amount, nickname, message) + "\n" + matched.getCommand()), false);
+                                if(cs.getSource().getEntity() instanceof ServerPlayer)
                                 {
                                     matched.runCommands(cs.getSource());
                                 } else
                                 {
-                                    ClientPlayerEntity clientPlayer = (ClientPlayerEntity)cs.getSource().getEntity();
+                                    LocalPlayer clientPlayer = (LocalPlayer) cs.getSource().getEntity();
                                     matched.runCommands(clientPlayer);
                                 }
                                 return 0;

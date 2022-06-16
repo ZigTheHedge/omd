@@ -1,23 +1,21 @@
 package com.cwelth.omd.commands;
 
 import com.cwelth.omd.Config;
-import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.builder.ArgumentBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.command.Commands;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TextFormatting;
-import net.minecraftforge.fml.loading.FMLPaths;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.TextComponent;
 
 public class CmdList {
-    public static ArgumentBuilder<CommandSource, ?> register(CommandDispatcher<CommandSource> dispatcher) {
+    public static LiteralArgumentBuilder<CommandSourceStack> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("list")
                 .executes( cs -> {
                     for(ThresholdItem item : Config.THRESHOLDS_COLLECTION.list)
                     {
-                        cs.getSource().sendSuccess(new StringTextComponent("[OMD]" + TextFormatting.AQUA + " " + item.amount + ", exact: " + item.exact + ", message: " + item.message + ", commands: " + item.command), false);
+                        cs.getSource().sendSuccess(new TextComponent("[OMD]" + ChatFormatting.AQUA + " " + item.amount + ", exact: " + item.exact + ", message: " + item.message + ", commands: " + item.command), false);
                     }
                     return 0;
                 });

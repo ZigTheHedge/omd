@@ -3,11 +3,12 @@ package com.cwelth.omd.websocket;
 import com.cwelth.omd.services.DonationAlerts;
 import com.cwelth.omd.services.DonationService;
 import com.cwelth.omd.services.EnumWssState;
-import net.minecraft.client.entity.player.ClientPlayerEntity;
-import net.minecraft.util.Util;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.Util;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.TranslatableComponent;
 
-import javax.websocket.*;
+
+import jakarta.websocket.*;
 import java.io.IOException;
 import java.net.URI;
 
@@ -15,14 +16,14 @@ import java.net.URI;
 public class WebSocketEndpoint {
     Session userSession = null;
     private MessageHandler messageHandler;
-    private ClientPlayerEntity player;
+    private LocalPlayer player;
     private String serviceName;
     private boolean shouldKeepTrying = false;
     private WebSocketContainer container;
     private URI endpoint;
     private DonationService serviceClass;
 
-    public WebSocketEndpoint(URI endpointURI, ClientPlayerEntity player, DonationService serviceClass, String serviceName) {
+    public WebSocketEndpoint(URI endpointURI, LocalPlayer player, DonationService serviceClass, String serviceName) {
         this.player = player;
         this.serviceClass = serviceClass;
         this.serviceName = serviceName;
@@ -53,7 +54,7 @@ public class WebSocketEndpoint {
     public void onOpen(Session userSession) {
         this.userSession = userSession;
         if(shouldKeepTrying) {
-            player.sendMessage(new TranslationTextComponent("service.websocket.reconnected", serviceName), Util.NIL_UUID);
+            player.sendMessage(new TranslatableComponent("service.websocket.reconnected", serviceName), Util.NIL_UUID);
             shouldKeepTrying = false;
             serviceClass.wssState = EnumWssState.START;
         }
@@ -68,13 +69,13 @@ public class WebSocketEndpoint {
     @OnClose
     public void onClose(Session userSession, CloseReason reason) {
         System.out.println("closing websocket. " + reason.getReasonPhrase());
-        player.sendMessage(new TranslationTextComponent("service.websocket.disconnect", serviceName, reason.getReasonPhrase()), Util.NIL_UUID);
+        player.sendMessage(new TranslatableComponent("service.websocket.disconnect", serviceName, reason.getReasonPhrase()), Util.NIL_UUID);
         this.userSession = null;
         shouldKeepTrying = true;
         new Thread( () -> {
             while(shouldKeepTrying) {
                 try {
-                    player.sendMessage(new TranslationTextComponent("service.websocket.tryreconnect", serviceName), Util.NIL_UUID);
+                    player.sendMessage(new TranslatableComponent("service.websocket.tryreconnect", serviceName), Util.NIL_UUID);
                     container.connectToServer(this, endpoint);
                 } catch (DeploymentException e) {
                     e.printStackTrace();
