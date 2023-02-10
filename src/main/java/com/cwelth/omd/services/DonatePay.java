@@ -3,6 +3,7 @@ package com.cwelth.omd.services;
 import com.cwelth.omd.Config;
 import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
+import com.cwelth.omd.websocket.WebSocketEndpoint;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -12,6 +13,8 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraftforge.common.ForgeConfigSpec;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.concurrent.Future;
 
@@ -38,11 +41,117 @@ public class DonatePay extends DonationService {
         if(Config.DP.OAUTH_KEY.get().isEmpty()) return false;
         started = true;
         this.player = player;
+        wssState = EnumWssState.START;
         OMD.LOGGER.info("[OMD] Starting DonatePay service...");
         if(Config.DP.WEB_SOCKET.get()) {
-            player.sendMessage(new TranslatableComponent("service.wss.notsupported", CATEGORY), Util.NIL_UUID);
-            OMD.LOGGER.error("[OMD] DonatePay failed to start (WSS not supported).");
-            return false;
+            HashMap<String, String> headers = new HashMap<>();
+            headers.put("Content-Type", "application/json");
+            String response = performSyncJSONRequest("https://donatepay.ru/api/v2/socket/token", "POST", headers, "{ \"access_token\": \"" + Config.DP.OAUTH_KEY.get() + "\" }");
+            if(response == null)
+            {
+                this.valid = false;
+                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                OMD.LOGGER.error("[OMD] DonatePay failed to start (Connection issues).");
+                return false;
+            }
+            JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
+            wssToken = obj.get("token").getAsString();
+
+            response = performSyncJSONRequest("https://donatepay.ru/api/v1/user?access_token=" + Config.DP.OAUTH_KEY.get(), "GET", headers, "");
+            if(response == null)
+            {
+                this.valid = false;
+                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                OMD.LOGGER.error("[OMD] DonatePay failed to start (Connection issues).");
+                return false;
+            }
+            obj = new JsonParser().parse(response).getAsJsonObject();
+            serviceUserID = obj.get("data").getAsJsonObject().get("id").getAsString();
+
+            new Thread(() -> {
+                try {
+                    if(websocket == null) {
+                        websocket = new WebSocketEndpoint(new URI("wss://centrifugo.donatepay.ru:43002/connection/websocket"), player, this, CATEGORY);
+                        websocket.addMessageHandler(new WebSocketEndpoint.MessageHandler() {
+                            @Override
+                            public void handleMessage(String message) {
+                                JsonObject obj = new JsonParser().parse(message).getAsJsonObject();
+
+                                if (obj.has("id")) {
+                                    if (obj.get("id").getAsInt() == 1) {
+                                        wssClientId = obj.get("result").getAsJsonObject().get("client").getAsString();
+                                        wssState = EnumWssState.WAITFORCLIENTID;
+                                        //player.sendMessage(new StringTextComponent("Handshake succeeded! Got Client-ID: " + wssClientId), Util.NIL_UUID);
+
+                                        HashMap<String, String> headers = new HashMap<>();
+                                        headers.put("Content-Type", "application/json");
+                                        String response = performSyncJSONRequest("https://donatepay.ru/api/v2/socket/token?access_token=" + Config.DP.OAUTH_KEY.get(), "POST", headers, "{\"channels\":[\"$public:" + serviceUserID + "\"], \"client\":\"" + wssClientId + "\"}");
+
+                                        obj = new JsonParser().parse(response).getAsJsonObject();
+                                        wssChannelToken = obj.get("channels").getAsJsonArray().get(0).getAsJsonObject().get("token").getAsString();
+                                        wssState = EnumWssState.WAITFORCHANNELID;
+                                        player.sendMessage(new TranslatableComponent("service.start.success.wss", CATEGORY), Util.NIL_UUID);
+                                        OMD.LOGGER.info("[OMD] DonatePay started successfully.");
+
+                                    } else if (obj.get("id").getAsInt() == 2) {
+                                        //System.out.println("Got channel_id: " + message);
+                                        wssState = EnumWssState.READY;
+                                    }
+                                } else if (obj.has("result")) {
+                                    if (!obj.get("result").getAsJsonObject().has("type")) {
+                                        JsonObject data = obj.get("result").getAsJsonObject().get("data").getAsJsonObject().get("data").getAsJsonObject().get("notification").getAsJsonObject().get("vars").getAsJsonObject();
+                                        int amount = (int)data.get("sum").getAsDouble();
+                                        String nickname = data.get("name").getAsString();
+                                        String msg = data.get("comment").getAsString();
+                                        ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
+                                        String mText = "not found";
+                                        if(match != null) mText = match.getCommand();
+                                        OMD.LOGGER.info("[OMD] New DonatePay donation! " + nickname + ": " + amount + ", match: " + mText);
+                                        if (match != null) {
+                                            if (Config.ECHOING.get().equals("before"))
+                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                            match.runCommands(player);
+                                            if (Config.ECHOING.get().equals("after"))
+                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                        }
+                                    }
+                                } else
+                                    System.out.println("Unknown message received! Report it to mod author please: " + message);
+                            }
+                        });
+                        executorThread.submit( () -> {
+                            while (true) {
+                                switch (wssState) {
+                                    case START: {
+                                        // System.out.println("Sending handshake. ");
+                                        websocket.sendMessage("{\"params\": {\"token\": \"" + wssToken + "\"}, \"id\": 1}");
+                                        break;
+                                    }
+                                    case WAITFORCHANNELID: {
+                                        // System.out.println("Sending request for channel_id. ");
+                                        websocket.sendMessage("{ \"params\": { \"channel\": \"$public:" + serviceUserID + "\", \"token\": \"" + wssChannelToken + "\" }, \"method\": 1, \"id\": 2 }");
+                                        break;
+                                    }
+                                }
+                                try {
+                                    Thread.sleep(500);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                                if(!started)
+                                {
+                                    websocket.disconnect();
+                                    break;
+                                }
+                            }
+                        });
+
+                    }
+                } catch (URISyntaxException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
         } else
         {
             HashMap<String, String> headers = new HashMap<>();
