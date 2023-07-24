@@ -1,1 +1,1 @@
-shaded.glassfish.tyrus.container.grizzly.client.GrizzlyContainerProvider
+org.glassfish.tyrus.container.grizzly.client.GrizzlyContainerProvider
