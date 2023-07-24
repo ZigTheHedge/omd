@@ -125,7 +125,7 @@ public class DonationAlerts extends DonationService {
                                     if (!obj.get("result").getAsJsonObject().has("type")) {
                                         JsonObject data = obj.get("result").getAsJsonObject().get("data").getAsJsonObject().get("data").getAsJsonObject();
                                         int amount = (int)data.get("amount_in_user_currency").getAsDouble();
-                                        String nickname = "Аноним";
+                                        String nickname = "Anonymous";
                                         if(!data.get("username").isJsonNull())
                                             nickname = data.get("username").getAsString();
                                         String msg = "";
