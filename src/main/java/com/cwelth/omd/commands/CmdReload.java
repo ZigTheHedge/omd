@@ -7,7 +7,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 public class CmdReload {
@@ -16,10 +16,9 @@ public class CmdReload {
                 .executes( cs -> {
                     Config.loadConfig(Config.CLIENT_CONFIG, FMLPaths.CONFIGDIR.get().resolve(OMD.MOD_ID + "-client.toml"));
                     Config.DP.stop();
-                    Config.SL.stop();
                     Config.DA.stop();
                     Config.LOCAL.stop();
-                    cs.getSource().sendSuccess(new TextComponent("[OMD]" + ChatFormatting.AQUA + " Config reloaded."), false);
+                    cs.getSource().sendSuccess(Component.translatable("[OMD]" + ChatFormatting.AQUA + " Config reloaded."), false);
                     return 0;
                 });
     }

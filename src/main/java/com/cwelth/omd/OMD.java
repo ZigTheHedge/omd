@@ -63,10 +63,8 @@ public class OMD
                 if(event.player instanceof RemotePlayer) return;
                 Config.DA.start((LocalPlayer)event.player);
                 Config.DP.start((LocalPlayer)event.player);
-                Config.SL.start((LocalPlayer)event.player);
                 Config.LOCAL.start((LocalPlayer)event.player);
                 Config.DP.tick();
-                Config.SL.tick();
                 Config.DA.tick();
                 Config.LOCAL.tick();
             }
@@ -76,7 +74,6 @@ public class OMD
         public void serverStopping(ServerStoppingEvent event)
         {
             Config.DP.stop();
-            Config.SL.stop();
             Config.DA.stop();
             Config.LOCAL.stop();
         }

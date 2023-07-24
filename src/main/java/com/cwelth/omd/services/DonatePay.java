@@ -3,20 +3,20 @@ package com.cwelth.omd.services;
 import com.cwelth.omd.Config;
 import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
-import com.cwelth.omd.websocket.WebSocketEndpoint;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.Util;
+
+import com.neovisionaries.ws.client.*;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.common.ForgeConfigSpec;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.concurrent.Future;
+import java.util.List;
+import java.util.Map;
+
 
 public class DonatePay extends DonationService {
     public boolean revalidationNeeded = false;
@@ -50,7 +50,7 @@ public class DonatePay extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.failure", CATEGORY, "Check your OAUTH key!"));
                 OMD.LOGGER.error("[OMD] DonatePay failed to start (Connection issues).");
                 return false;
             }
@@ -61,7 +61,7 @@ public class DonatePay extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.failure", CATEGORY, "Check your OAUTH key!"));
                 OMD.LOGGER.error("[OMD] DonatePay failed to start (Connection issues).");
                 return false;
             }
@@ -71,10 +71,39 @@ public class DonatePay extends DonationService {
             new Thread(() -> {
                 try {
                     if(websocket == null) {
-                        websocket = new WebSocketEndpoint(new URI("wss://centrifugo.donatepay.ru:43002/connection/websocket"), player, this, CATEGORY);
-                        websocket.addMessageHandler(new WebSocketEndpoint.MessageHandler() {
+                        websocket = new WebSocketFactory()
+                                .setConnectionTimeout(1500)
+                                .createSocket("wss://centrifugo.donatepay.ru:43002/connection/websocket");
+
+                        websocket.addListener(new WebSocketAdapter() {
                             @Override
-                            public void handleMessage(String message) {
+                            public void onConnected(WebSocket websocket, Map<String, List<String>> headers) throws Exception {
+                                if(shouldKeepTrying) {
+                                    player.sendSystemMessage(Component.translatable("service.websocket.reconnected", CATEGORY));
+                                    shouldKeepTrying = false;
+                                    wssState = EnumWssState.START;
+                                }
+                            }
+
+                            @Override
+                            public void onDisconnected(WebSocket websocket, WebSocketFrame serverCloseFrame, WebSocketFrame clientCloseFrame, boolean closedByServer) throws Exception {
+                                player.sendSystemMessage(Component.translatable("service.websocket.disconnect", CATEGORY, serverCloseFrame.getCloseReason()));
+                                shouldKeepTrying = true;
+                                new Thread( () -> {
+                                    while(shouldKeepTrying) {
+                                        player.sendSystemMessage(Component.translatable("service.websocket.tryreconnect", CATEGORY));
+                                        start(player);
+                                        try {
+                                            Thread.sleep(RECONNECT_INTERVAL.get() * 1000);
+                                        } catch (InterruptedException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                }).start();
+                            }
+
+                            @Override
+                            public void onTextMessage(WebSocket websocket, String message) throws Exception {
                                 JsonObject obj = new JsonParser().parse(message).getAsJsonObject();
 
                                 if (obj.has("id")) {
@@ -90,7 +119,7 @@ public class DonatePay extends DonationService {
                                         obj = new JsonParser().parse(response).getAsJsonObject();
                                         wssChannelToken = obj.get("channels").getAsJsonArray().get(0).getAsJsonObject().get("token").getAsString();
                                         wssState = EnumWssState.WAITFORCHANNELID;
-                                        player.sendMessage(new TranslatableComponent("service.start.success.wss", CATEGORY), Util.NIL_UUID);
+                                        player.sendSystemMessage(Component.translatable("service.start.success.wss", CATEGORY));
                                         OMD.LOGGER.info("[OMD] DonatePay started successfully.");
 
                                     } else if (obj.get("id").getAsInt() == 2) {
@@ -109,27 +138,27 @@ public class DonatePay extends DonationService {
                                         OMD.LOGGER.info("[OMD] New DonatePay donation! " + nickname + ": " + amount + ", match: " + mText);
                                         if (match != null) {
                                             if (Config.ECHOING.get().equals("before"))
-                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                                player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                                             match.runCommands(player);
                                             if (Config.ECHOING.get().equals("after"))
-                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                                player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                                         }
                                     }
                                 } else
                                     System.out.println("Unknown message received! Report it to mod author please: " + message);
                             }
-                        });
+                        }).connect();
                         executorThread.submit( () -> {
                             while (true) {
                                 switch (wssState) {
                                     case START: {
                                         // System.out.println("Sending handshake. ");
-                                        websocket.sendMessage("{\"params\": {\"token\": \"" + wssToken + "\"}, \"id\": 1}");
+                                        websocket.sendText("{\"params\": {\"token\": \"" + wssToken + "\"}, \"id\": 1}");
                                         break;
                                     }
                                     case WAITFORCHANNELID: {
                                         // System.out.println("Sending request for channel_id. ");
-                                        websocket.sendMessage("{ \"params\": { \"channel\": \"$public:" + serviceUserID + "\", \"token\": \"" + wssChannelToken + "\" }, \"method\": 1, \"id\": 2 }");
+                                        websocket.sendText("{ \"params\": { \"channel\": \"$public:" + serviceUserID + "\", \"token\": \"" + wssChannelToken + "\" }, \"method\": 1, \"id\": 2 }");
                                         break;
                                     }
                                 }
@@ -147,7 +176,9 @@ public class DonatePay extends DonationService {
                         });
 
                     }
-                } catch (URISyntaxException e) {
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (WebSocketException e) {
                     e.printStackTrace();
                 }
             }).start();
@@ -162,20 +193,20 @@ public class DonatePay extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.failure", CATEGORY, "Check your OAUTH key!"));
                 OMD.LOGGER.error("[OMD] DonatePay failed to start (Connection issues).");
             } else {
                 JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
                 if(obj.get("status").getAsString().equals("error")) {
                     if(obj.get("message").getAsString().equals("Incorrect token")) {
                         this.valid = false;
-                        player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                        player.sendSystemMessage(Component.translatable("service.start.failure", CATEGORY, "Check your OAUTH key!"));
                         OMD.LOGGER.error("[OMD] DonatePay failed to start (Invalid token).");
                     } else {
                         this.revalidationNeeded = true;
                         this.valid = true;
                         ticksLeft = 20;
-                        player.sendMessage(new TranslatableComponent("service.start.failure.wait", CATEGORY), Util.NIL_UUID);
+                        player.sendSystemMessage(Component.translatable("service.start.failure.wait", CATEGORY));
                         OMD.LOGGER.warn("[OMD] DonatePay start pending (Too many tries).");
                     }
                 } else {
@@ -183,7 +214,7 @@ public class DonatePay extends DonationService {
                     if (dataElement.size() > 0)
                         lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsString();
                     this.valid = true;
-                    player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                    player.sendSystemMessage(Component.translatable("service.start.success.rest", CATEGORY));
                     OMD.LOGGER.info("[OMD] DonatePay started successfully.");
                     ticksLeft = POLL_INTERVAL.get() * 20;
                 }
@@ -215,7 +246,7 @@ public class DonatePay extends DonationService {
             if(this.revalidationNeeded)
             {
                 this.revalidationNeeded = false;
-                player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.success.rest", CATEGORY));
                 OMD.LOGGER.info("[OMD] DonatePay started successfully.");
                 if (obj.get("data").getAsJsonArray().size() > 0)
                     lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsString();
@@ -251,10 +282,10 @@ public class DonatePay extends DonationService {
                         OMD.LOGGER.info("[OMD] New DonatePay donation! " + nickname + ": " + amount + ", match: " + mText);
                         if (match != null) {
                             if (Config.ECHOING.get().equals("before"))
-                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                             match.runCommands(player);
                             if (Config.ECHOING.get().equals("after"))
-                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                         }
                         lastDonationId = data.get("id").getAsString();
                     }

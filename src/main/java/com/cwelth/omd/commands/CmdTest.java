@@ -10,8 +10,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 public class CmdTest {
@@ -25,12 +24,12 @@ public class CmdTest {
                                 ThresholdItem matched = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                                 if(matched == null)
                                 {
-                                    cs.getSource().sendFailure(new TranslatableComponent("test.nomatch"));
+                                    cs.getSource().sendFailure(Component.translatable("test.nomatch"));
                                     return 0;
                                 }
                                 String nickname = StringArgumentType.getString(cs, "nickname");
                                 String message = StringArgumentType.getString(cs, "message");
-                                cs.getSource().sendSuccess(new TextComponent("[OMD]" + ChatFormatting.AQUA + " " + matched.getMessage(amount, nickname, message) + "\n" + matched.getCommand()), false);
+                                cs.getSource().sendSuccess(Component.translatable("[OMD]" + ChatFormatting.AQUA + " " + matched.getMessage(amount, nickname, message) + "\n" + matched.getCommand()), false);
                                 if(cs.getSource().getEntity() instanceof ServerPlayer)
                                 {
                                     matched.runCommands(cs.getSource());

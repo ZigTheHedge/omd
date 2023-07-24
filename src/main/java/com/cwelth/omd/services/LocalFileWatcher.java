@@ -5,8 +5,7 @@ import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
 import net.minecraft.Util;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.io.File;
@@ -37,7 +36,7 @@ public class LocalFileWatcher extends DonationService {
         started = true;
         this.player = player;
 
-        this.player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+        this.player.sendSystemMessage(Component.translatable("service.start.success.rest", CATEGORY));
         return true;
     }
 
@@ -90,10 +89,10 @@ public class LocalFileWatcher extends DonationService {
                 ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                 if (match != null) {
                     if (Config.ECHOING.get().equals("before"))
-                        player.sendMessage(new TextComponent(match.getMessage(amount, nickname, message)), Util.NIL_UUID);
+                        player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, message)));
                     match.runCommands(player);
                     if (Config.ECHOING.get().equals("after"))
-                        player.sendMessage(new TextComponent(match.getMessage(amount, nickname, message)), Util.NIL_UUID);
+                        player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, message)));
                 }
                 removeFile(otOMD);
             }

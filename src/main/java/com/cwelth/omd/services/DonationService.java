@@ -1,7 +1,7 @@
 package com.cwelth.omd.services;
 
 import com.cwelth.omd.OMD;
-import com.cwelth.omd.websocket.WebSocketEndpoint;
+import com.neovisionaries.ws.client.WebSocket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraftforge.common.ForgeConfigSpec;
@@ -24,13 +24,14 @@ public abstract class DonationService {
     public boolean valid = false;
     public LocalPlayer player;
     public int ticksLeft;
-    public WebSocketEndpoint websocket = null;
+    public WebSocket websocket = null;
     public String wssClientId = "";
     public String wssToken = "";
     public String wssChannelToken = "";
     public String serviceUserID = "";
     public EnumWssState wssState = EnumWssState.START;
     public String lastDonationId = null;
+    public boolean shouldKeepTrying = false;
 
     public ExecutorService executorThread = Executors.newFixedThreadPool(1);
 

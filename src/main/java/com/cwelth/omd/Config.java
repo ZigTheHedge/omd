@@ -1,11 +1,9 @@
 package com.cwelth.omd;
 
-import com.cwelth.omd.data.ThresholdItem;
 import com.cwelth.omd.data.Thresholds;
 import com.cwelth.omd.services.DonatePay;
 import com.cwelth.omd.services.DonationAlerts;
 import com.cwelth.omd.services.LocalFileWatcher;
-import com.cwelth.omd.services.StreamLabs;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
 import net.minecraftforge.common.ForgeConfigSpec;
@@ -20,7 +18,6 @@ public class Config {
 
     public static final DonationAlerts DA = new DonationAlerts();
     public static final DonatePay DP = new DonatePay();
-    public static final StreamLabs SL = new StreamLabs();
     public static final LocalFileWatcher LOCAL = new LocalFileWatcher();
 
     public static final String CATEGORY_THRESHOLDS = "thresholds";
@@ -47,9 +44,6 @@ public class Config {
 
         //DonatePay.RU
         DP.init(CLIENT_BUILDER, "DonatePay.RU");
-
-        //StreamLabs.COM
-        SL.init(CLIENT_BUILDER, "StreamLabs.COM");
 
         //Local file
         LOCAL.init(CLIENT_BUILDER, "Local file (named \"otomd\" by default, located in root directory of modpack e.g mods\\..)");

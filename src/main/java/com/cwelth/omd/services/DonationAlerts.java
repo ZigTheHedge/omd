@@ -3,18 +3,19 @@ package com.cwelth.omd.services;
 import com.cwelth.omd.Config;
 import com.cwelth.omd.OMD;
 import com.cwelth.omd.data.ThresholdItem;
-import com.cwelth.omd.websocket.WebSocketEndpoint;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.Util;
+import com.neovisionaries.ws.client.*;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.common.ForgeConfigSpec;
 
+import java.io.IOException;
 import java.net.*;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class DonationAlerts extends DonationService {
 
@@ -51,7 +52,7 @@ public class DonationAlerts extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.failure", CATEGORY, "Check your OAUTH key!"));
                 OMD.LOGGER.error("[OMD] DonationAlerts failed to start (Connection issues).");
                 return false;
             }
@@ -63,10 +64,39 @@ public class DonationAlerts extends DonationService {
             new Thread(() -> {
                 try {
                     if(websocket == null) {
-                        websocket = new WebSocketEndpoint(new URI("wss://centrifugo.donationalerts.com/connection/websocket"), player, this, CATEGORY);
-                        websocket.addMessageHandler(new WebSocketEndpoint.MessageHandler() {
+                        websocket = new WebSocketFactory()
+                                .setConnectionTimeout(1500)
+                                .createSocket("wss://centrifugo.donationalerts.com/connection/websocket");
+
+                        websocket.addListener(new WebSocketAdapter() {
                             @Override
-                            public void handleMessage(String message) {
+                            public void onConnected(WebSocket websocket, Map<String, List<String>> headers) throws Exception {
+                                if(shouldKeepTrying) {
+                                    player.sendSystemMessage(Component.translatable("service.websocket.reconnected", CATEGORY));
+                                    shouldKeepTrying = false;
+                                    wssState = EnumWssState.START;
+                                }
+                            }
+
+                            @Override
+                            public void onDisconnected(WebSocket websocket, WebSocketFrame serverCloseFrame, WebSocketFrame clientCloseFrame, boolean closedByServer) throws Exception {
+                                player.sendSystemMessage(Component.translatable("service.websocket.disconnect", CATEGORY, serverCloseFrame.getCloseReason()));
+                                shouldKeepTrying = true;
+                                new Thread( () -> {
+                                    while(shouldKeepTrying) {
+                                        player.sendSystemMessage(Component.translatable("service.websocket.tryreconnect", CATEGORY));
+                                        start(player);
+                                        try {
+                                            Thread.sleep(RECONNECT_INTERVAL.get() * 1000);
+                                        } catch (InterruptedException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                }).start();
+                            }
+
+                            @Override
+                            public void onTextMessage(WebSocket websocket, String message) throws Exception {
                                 JsonObject obj = new JsonParser().parse(message).getAsJsonObject();
 
                                 if (obj.has("id")) {
@@ -84,7 +114,7 @@ public class DonationAlerts extends DonationService {
                                         obj = new JsonParser().parse(response).getAsJsonObject();
                                         wssChannelToken = obj.get("channels").getAsJsonArray().get(0).getAsJsonObject().get("token").getAsString();
                                         wssState = EnumWssState.WAITFORCHANNELID;
-                                        player.sendMessage(new TranslatableComponent("service.start.success.wss", CATEGORY), Util.NIL_UUID);
+                                        player.sendSystemMessage(Component.translatable("service.start.success.wss", CATEGORY));
                                         OMD.LOGGER.info("[OMD] DonationAlerts started successfully.");
 
                                     } else if (obj.get("id").getAsInt() == 2) {
@@ -95,35 +125,39 @@ public class DonationAlerts extends DonationService {
                                     if (!obj.get("result").getAsJsonObject().has("type")) {
                                         JsonObject data = obj.get("result").getAsJsonObject().get("data").getAsJsonObject().get("data").getAsJsonObject();
                                         int amount = (int)data.get("amount_in_user_currency").getAsDouble();
-                                        String nickname = data.get("username").getAsString();
-                                        String msg = data.get("message").getAsString();
+                                        String nickname = "Аноним";
+                                        if(!data.get("username").isJsonNull())
+                                            nickname = data.get("username").getAsString();
+                                        String msg = "";
+                                        if(!data.get("message").isJsonNull())
+                                            msg = data.get("message").getAsString();
                                         ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                                         String mText = "not found";
                                         if(match != null) mText = match.getCommand();
                                         OMD.LOGGER.info("[OMD] New DonationAlerts donation! " + nickname + ": " + amount + ", match: " + mText);
                                         if (match != null) {
                                             if (Config.ECHOING.get().equals("before"))
-                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                                player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                                             match.runCommands(player);
                                             if (Config.ECHOING.get().equals("after"))
-                                                player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                                                player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                                         }
                                     }
                                 } else
                                     System.out.println("Unknown message received! Report it to mod author please: " + message);
                             }
-                        });
+                        }).connect();
                         executorThread.submit( () -> {
                             while (true) {
                                 switch (wssState) {
                                     case START: {
                                         // System.out.println("Sending handshake. ");
-                                        websocket.sendMessage("{\"params\": {\"token\": \"" + wssToken + "\"}, \"id\": 1}");
+                                        websocket.sendText("{\"params\": {\"token\": \"" + wssToken + "\"}, \"id\": 1}");
                                         break;
                                     }
                                     case WAITFORCHANNELID: {
                                         // System.out.println("Sending request for channel_id. ");
-                                        websocket.sendMessage("{ \"params\": { \"channel\": \"$alerts:donation_" + serviceUserID + "\", \"token\": \"" + wssChannelToken + "\" }, \"method\": 1, \"id\": 2 }");
+                                        websocket.sendText("{ \"params\": { \"channel\": \"$alerts:donation_" + serviceUserID + "\", \"token\": \"" + wssChannelToken + "\" }, \"method\": 1, \"id\": 2 }");
                                         break;
                                     }
                                 }
@@ -141,8 +175,10 @@ public class DonationAlerts extends DonationService {
                         });
 
                     }
-                } catch (URISyntaxException e) {
-                    e.printStackTrace();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (WebSocketException e) {
+                    throw new RuntimeException(e);
                 }
             }).start();
 
@@ -155,14 +191,14 @@ public class DonationAlerts extends DonationService {
             if(response == null)
             {
                 this.valid = false;
-                player.sendMessage(new TranslatableComponent("service.start.failure", CATEGORY, "Check your OAUTH key!"), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.failure", CATEGORY, "Check your OAUTH key!"));
             } else {
                 JsonObject obj = new JsonParser().parse(response).getAsJsonObject();
                 JsonArray dataElement = obj.get("data").getAsJsonArray();
                 if(dataElement.size() > 0)
                     lastDonationId = obj.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsString();
                 this.valid = true;
-                player.sendMessage(new TranslatableComponent("service.start.success.rest", CATEGORY), Util.NIL_UUID);
+                player.sendSystemMessage(Component.translatable("service.start.success.rest", CATEGORY));
                 ticksLeft = POLL_INTERVAL.get() * 20;
             }
         }
@@ -204,10 +240,10 @@ public class DonationAlerts extends DonationService {
                     ThresholdItem match = Config.THRESHOLDS_COLLECTION.getSuitableThreshold(amount);
                     if (match != null) {
                         if (Config.ECHOING.get().equals("before"))
-                            player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                            player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                         match.runCommands(player);
                         if (Config.ECHOING.get().equals("after"))
-                            player.sendMessage(new TextComponent(match.getMessage(amount, nickname, msg)), Util.NIL_UUID);
+                            player.sendSystemMessage(Component.translatable(match.getMessage(amount, nickname, msg)));
                     }
                     lastDonationId = data.get("id").getAsString();
                 }

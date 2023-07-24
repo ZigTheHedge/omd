@@ -1,5 +1,7 @@
 package com.cwelth.omd.data;
 
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.ParseResults;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
@@ -40,8 +42,8 @@ public class ThresholdItem {
         List<String> commands = Arrays.asList(getCommand().split(";"));
         for(String cmd : commands)
         {
-
-            player.chat(cmd);
+            if(cmd.startsWith("/")) cmd = cmd.substring(1);
+            player.commandUnsigned(cmd);
         }
     }
 
@@ -52,8 +54,11 @@ public class ThresholdItem {
         for(String cmd : commands)
         {
             ServerPlayer serverPlayer = (ServerPlayer) cs.getEntity();
-            MinecraftServer mc = serverPlayer.getServer();
-            mc.getCommands().performCommand(cs, cmd);
+            CommandDispatcher<CommandSourceStack> commanddispatcher = serverPlayer.getServer().getCommands().getDispatcher();
+            if(cmd.startsWith("/")) cmd = cmd.substring(1);
+            ParseResults<CommandSourceStack> results = commanddispatcher.parse(cmd, cs);
+
+            serverPlayer.getServer().getCommands().performCommand(results, cmd);
         }
     }
 }
